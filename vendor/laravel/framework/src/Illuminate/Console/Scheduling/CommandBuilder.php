@@ -3,7 +3,7 @@
 namespace Illuminate\Console\Scheduling;
 
 use Illuminate\Console\Application;
-use Symfony\Component\Process\ProcessUtils;
+use Illuminate\Support\ProcessUtils;
 
 class CommandBuilder
 {
@@ -17,9 +17,9 @@ class CommandBuilder
     {
         if ($event->runInBackground) {
             return $this->buildBackgroundCommand($event);
-        } else {
-            return $this->buildForegroundCommand($event);
         }
+
+        return $this->buildForegroundCommand($event);
     }
 
     /**
@@ -51,8 +51,12 @@ class CommandBuilder
 
         $finished = Application::formatCommandString('schedule:finish').' "'.$event->mutexName().'"';
 
+        if (windows_os()) {
+            return 'start /b cmd /v:on /c "('.$event->command.' & '.$finished.' ^!ERRORLEVEL^!)'.$redirect.$output.' 2>&1"';
+        }
+
         return $this->ensureCorrectUser($event,
-            '('.$event->command.$redirect.$output.' 2>&1 '.(windows_os() ? '&' : ';').' '.$finished.') > '
+            '('.$event->command.$redirect.$output.' 2>&1 ; '.$finished.' "$?") > '
             .ProcessUtils::escapeArgument($event->getDefaultOutput()).' 2>&1 &'
         );
     }

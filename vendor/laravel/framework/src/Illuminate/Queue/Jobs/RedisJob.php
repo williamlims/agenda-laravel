@@ -2,10 +2,9 @@
 
 namespace Illuminate\Queue\Jobs;
 
-use Illuminate\Support\Arr;
-use Illuminate\Queue\RedisQueue;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
+use Illuminate\Queue\RedisQueue;
 
 class RedisJob extends Job implements JobContract
 {
@@ -88,7 +87,7 @@ class RedisJob extends Job implements JobContract
     /**
      * Release the job back into the queue.
      *
-     * @param  int   $delay
+     * @param  int  $delay
      * @return void
      */
     public function release($delay = 0)
@@ -105,23 +104,23 @@ class RedisJob extends Job implements JobContract
      */
     public function attempts()
     {
-        return Arr::get($this->decoded, 'attempts') + 1;
+        return ($this->decoded['attempts'] ?? null) + 1;
     }
 
     /**
      * Get the job identifier.
      *
-     * @return string
+     * @return string|null
      */
     public function getJobId()
     {
-        return Arr::get($this->decoded, 'id');
+        return $this->decoded['id'] ?? null;
     }
 
     /**
      * Get the underlying Redis factory implementation.
      *
-     * @return \Illuminate\Contracts\Redis\Factory
+     * @return \Illuminate\Queue\RedisQueue
      */
     public function getRedisQueue()
     {

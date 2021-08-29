@@ -2,6 +2,7 @@
 
 namespace Illuminate\Notifications\Messages;
 
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Notifications\Action;
 
 class SimpleMessage
@@ -61,6 +62,13 @@ class SimpleMessage
      * @var string
      */
     public $actionUrl;
+
+    /**
+     * The name of the mailer that should send the notification.
+     *
+     * @var string
+     */
+    public $mailer;
 
     /**
      * Indicate that the notification gives information about a successful operation.
@@ -141,7 +149,7 @@ class SimpleMessage
     /**
      * Add a line of text to the notification.
      *
-     * @param  \Illuminate\Notifications\Action|string  $line
+     * @param  mixed  $line
      * @return $this
      */
     public function line($line)
@@ -152,7 +160,7 @@ class SimpleMessage
     /**
      * Add a line of text to the notification.
      *
-     * @param  \Illuminate\Notifications\Action|string|array  $line
+     * @param  mixed  $line
      * @return $this
      */
     public function with($line)
@@ -171,16 +179,20 @@ class SimpleMessage
     /**
      * Format the given line of text.
      *
-     * @param  string|array  $line
-     * @return string
+     * @param  \Illuminate\Contracts\Support\Htmlable|string|array  $line
+     * @return \Illuminate\Contracts\Support\Htmlable|string
      */
     protected function formatLine($line)
     {
+        if ($line instanceof Htmlable) {
+            return $line;
+        }
+
         if (is_array($line)) {
             return implode(' ', array_map('trim', $line));
         }
 
-        return trim(implode(' ', array_map('trim', preg_split('/\\r\\n|\\r|\\n/', $line))));
+        return trim(implode(' ', array_map('trim', preg_split('/\\r\\n|\\r|\\n/', $line ?? ''))));
     }
 
     /**
@@ -194,6 +206,19 @@ class SimpleMessage
     {
         $this->actionText = $text;
         $this->actionUrl = $url;
+
+        return $this;
+    }
+
+    /**
+     * Set the name of the mailer that should send the notification.
+     *
+     * @param  string  $mailer
+     * @return $this
+     */
+    public function mailer($mailer)
+    {
+        $this->mailer = $mailer;
 
         return $this;
     }
@@ -214,6 +239,7 @@ class SimpleMessage
             'outroLines' => $this->outroLines,
             'actionText' => $this->actionText,
             'actionUrl' => $this->actionUrl,
+            'displayableActionUrl' => str_replace(['mailto:', 'tel:'], '', $this->actionUrl ?? ''),
         ];
     }
 }

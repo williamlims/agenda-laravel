@@ -2,10 +2,11 @@
 
 namespace Illuminate\Queue\Failed;
 
-use Carbon\Carbon;
+use DateTimeInterface;
 use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Support\Facades\Date;
 
-class DatabaseFailedJobProvider implements FailedJobProviderInterface
+class DatabaseFailedJobProvider implements FailedJobProviderInterface, PrunableFailedJobProvider
 {
     /**
      * The connection resolver implementation.
@@ -49,12 +50,12 @@ class DatabaseFailedJobProvider implements FailedJobProviderInterface
      * @param  string  $connection
      * @param  string  $queue
      * @param  string  $payload
-     * @param  \Exception  $exception
+     * @param  \Throwable  $exception
      * @return int|null
      */
     public function log($connection, $queue, $payload, $exception)
     {
-        $failed_at = Carbon::now();
+        $failed_at = Date::now();
 
         $exception = (string) $exception;
 
@@ -77,7 +78,7 @@ class DatabaseFailedJobProvider implements FailedJobProviderInterface
      * Get a single failed job.
      *
      * @param  mixed  $id
-     * @return array
+     * @return object|null
      */
     public function find($id)
     {
@@ -103,6 +104,27 @@ class DatabaseFailedJobProvider implements FailedJobProviderInterface
     public function flush()
     {
         $this->getTable()->delete();
+    }
+
+    /**
+     * Prune all of the entries older than the given date.
+     *
+     * @param  \DateTimeInterface  $before
+     * @return int
+     */
+    public function prune(DateTimeInterface $before)
+    {
+        $query = $this->getTable()->where('failed_at', '<', $before);
+
+        $totalDeleted = 0;
+
+        do {
+            $deleted = $query->take(1000)->delete();
+
+            $totalDeleted += $deleted;
+        } while ($deleted !== 0);
+
+        return $totalDeleted;
     }
 
     /**

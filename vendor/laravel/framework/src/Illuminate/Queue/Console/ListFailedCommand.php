@@ -2,8 +2,8 @@
 
 namespace Illuminate\Queue\Console;
 
-use Illuminate\Support\Arr;
 use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 
 class ListFailedCommand extends Command
 {
@@ -24,7 +24,7 @@ class ListFailedCommand extends Command
     /**
      * The table headers for the command.
      *
-     * @var array
+     * @var string[]
      */
     protected $headers = ['ID', 'Connection', 'Queue', 'Class', 'Failed At'];
 
@@ -33,9 +33,9 @@ class ListFailedCommand extends Command
      *
      * @return void
      */
-    public function fire()
+    public function handle()
     {
-        if (count($jobs = $this->getFailedJobs()) == 0) {
+        if (count($jobs = $this->getFailedJobs()) === 0) {
             return $this->info('No failed jobs!');
         }
 
@@ -66,7 +66,7 @@ class ListFailedCommand extends Command
     {
         $row = array_values(Arr::except($failed, ['payload', 'exception']));
 
-        array_splice($row, 3, 0, $this->extractJobName($failed['payload']));
+        array_splice($row, 3, 0, $this->extractJobName($failed['payload']) ?: '');
 
         return $row;
     }
@@ -82,7 +82,7 @@ class ListFailedCommand extends Command
         $payload = json_decode($payload, true);
 
         if ($payload && (! isset($payload['data']['command']))) {
-            return Arr::get($payload, 'job');
+            return $payload['job'] ?? null;
         } elseif ($payload && isset($payload['data']['command'])) {
             return $this->matchJobName($payload);
         }
@@ -92,17 +92,13 @@ class ListFailedCommand extends Command
      * Match the job name from the payload.
      *
      * @param  array  $payload
-     * @return string
+     * @return string|null
      */
     protected function matchJobName($payload)
     {
         preg_match('/"([^"]+)"/', $payload['data']['command'], $matches);
 
-        if (isset($matches[1])) {
-            return $matches[1];
-        } else {
-            return Arr::get($payload, 'job');
-        }
+        return $matches[1] ?? $payload['job'] ?? null;
     }
 
     /**

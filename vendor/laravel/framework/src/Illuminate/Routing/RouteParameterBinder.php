@@ -32,9 +32,6 @@ class RouteParameterBinder
      */
     public function parameters($request)
     {
-        // If the route has a regular expression for the host part of the URI, we will
-        // compile that and get the parameter matches for this domain. We will then
-        // merge them into this parameters array so that this array is completed.
         $parameters = $this->bindPathParameters($request);
 
         // If the route has a regular expression for the host part of the URI, we will
@@ -106,7 +103,7 @@ class RouteParameterBinder
     protected function replaceDefaults(array $parameters)
     {
         foreach ($parameters as $key => $value) {
-            $parameters[$key] = isset($value) ? $value : Arr::get($this->route->defaults, $key);
+            $parameters[$key] = $value ?? Arr::get($this->route->defaults, $key);
         }
 
         foreach ($this->route->defaults as $key => $value) {

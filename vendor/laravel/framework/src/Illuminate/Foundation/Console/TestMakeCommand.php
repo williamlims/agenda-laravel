@@ -3,6 +3,8 @@
 namespace Illuminate\Foundation\Console;
 
 use Illuminate\Console\GeneratorCommand;
+use Illuminate\Support\Str;
+use Symfony\Component\Console\Input\InputOption;
 
 class TestMakeCommand extends GeneratorCommand
 {
@@ -11,7 +13,7 @@ class TestMakeCommand extends GeneratorCommand
      *
      * @var string
      */
-    protected $signature = 'make:test {name : The name of the class} {--unit : Create a unit test}';
+    protected $name = 'make:test';
 
     /**
      * The console command description.
@@ -34,11 +36,22 @@ class TestMakeCommand extends GeneratorCommand
      */
     protected function getStub()
     {
-        if ($this->option('unit')) {
-            return __DIR__.'/stubs/unit-test.stub';
-        } else {
-            return __DIR__.'/stubs/test.stub';
-        }
+        return $this->option('unit')
+                    ? $this->resolveStubPath('/stubs/test.unit.stub')
+                    : $this->resolveStubPath('/stubs/test.stub');
+    }
+
+    /**
+     * Resolve the fully-qualified path to the stub.
+     *
+     * @param  string  $stub
+     * @return string
+     */
+    protected function resolveStubPath($stub)
+    {
+        return file_exists($customPath = $this->laravel->basePath(trim($stub, '/')))
+                        ? $customPath
+                        : __DIR__.$stub;
     }
 
     /**
@@ -49,9 +62,9 @@ class TestMakeCommand extends GeneratorCommand
      */
     protected function getPath($name)
     {
-        $name = str_replace_first($this->rootNamespace(), '', $name);
+        $name = Str::replaceFirst($this->rootNamespace(), '', $name);
 
-        return $this->laravel->basePath().'/tests'.str_replace('\\', '/', $name).'.php';
+        return base_path('tests').str_replace('\\', '/', $name).'.php';
     }
 
     /**
@@ -77,5 +90,17 @@ class TestMakeCommand extends GeneratorCommand
     protected function rootNamespace()
     {
         return 'Tests';
+    }
+
+    /**
+     * Get the console command options.
+     *
+     * @return array
+     */
+    protected function getOptions()
+    {
+        return [
+            ['unit', 'u', InputOption::VALUE_NONE, 'Create a unit test.'],
+        ];
     }
 }

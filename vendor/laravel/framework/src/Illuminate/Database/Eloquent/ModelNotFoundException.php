@@ -2,9 +2,10 @@
 
 namespace Illuminate\Database\Eloquent;
 
-use RuntimeException;
+use Illuminate\Database\RecordsNotFoundException;
+use Illuminate\Support\Arr;
 
-class ModelNotFoundException extends RuntimeException
+class ModelNotFoundException extends RecordsNotFoundException
 {
     /**
      * Name of the affected Eloquent model.
@@ -30,7 +31,7 @@ class ModelNotFoundException extends RuntimeException
     public function setModel($model, $ids = [])
     {
         $this->model = $model;
-        $this->ids = array_wrap($ids);
+        $this->ids = Arr::wrap($ids);
 
         $this->message = "No query results for model [{$model}]";
 

@@ -2,7 +2,7 @@
 
 namespace Illuminate\Database\Eloquent\Concerns;
 
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Date;
 
 trait HasTimestamps
 {
@@ -34,15 +34,19 @@ trait HasTimestamps
      *
      * @return void
      */
-    protected function updateTimestamps()
+    public function updateTimestamps()
     {
         $time = $this->freshTimestamp();
 
-        if (! $this->isDirty(static::UPDATED_AT)) {
+        $updatedAtColumn = $this->getUpdatedAtColumn();
+
+        if (! is_null($updatedAtColumn) && ! $this->isDirty($updatedAtColumn)) {
             $this->setUpdatedAt($time);
         }
 
-        if (! $this->exists && ! $this->isDirty(static::CREATED_AT)) {
+        $createdAtColumn = $this->getCreatedAtColumn();
+
+        if (! $this->exists && ! is_null($createdAtColumn) && ! $this->isDirty($createdAtColumn)) {
             $this->setCreatedAt($time);
         }
     }
@@ -55,7 +59,7 @@ trait HasTimestamps
      */
     public function setCreatedAt($value)
     {
-        $this->{static::CREATED_AT} = $value;
+        $this->{$this->getCreatedAtColumn()} = $value;
 
         return $this;
     }
@@ -68,7 +72,7 @@ trait HasTimestamps
      */
     public function setUpdatedAt($value)
     {
-        $this->{static::UPDATED_AT} = $value;
+        $this->{$this->getUpdatedAtColumn()} = $value;
 
         return $this;
     }
@@ -76,11 +80,11 @@ trait HasTimestamps
     /**
      * Get a fresh timestamp for the model.
      *
-     * @return \Carbon\Carbon
+     * @return \Illuminate\Support\Carbon
      */
     public function freshTimestamp()
     {
-        return new Carbon;
+        return Date::now();
     }
 
     /**
@@ -106,7 +110,7 @@ trait HasTimestamps
     /**
      * Get the name of the "created at" column.
      *
-     * @return string
+     * @return string|null
      */
     public function getCreatedAtColumn()
     {
@@ -116,10 +120,30 @@ trait HasTimestamps
     /**
      * Get the name of the "updated at" column.
      *
-     * @return string
+     * @return string|null
      */
     public function getUpdatedAtColumn()
     {
         return static::UPDATED_AT;
+    }
+
+    /**
+     * Get the fully qualified "created at" column.
+     *
+     * @return string|null
+     */
+    public function getQualifiedCreatedAtColumn()
+    {
+        return $this->qualifyColumn($this->getCreatedAtColumn());
+    }
+
+    /**
+     * Get the fully qualified "updated at" column.
+     *
+     * @return string|null
+     */
+    public function getQualifiedUpdatedAtColumn()
+    {
+        return $this->qualifyColumn($this->getUpdatedAtColumn());
     }
 }

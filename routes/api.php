@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,18 +14,6 @@ use Illuminate\Http\Request;
 |
 */
 
-//Route::middleware('auth:api')->get('/user', function (Request $request) {
- //   return $request->user();
-//});
-
-Route::post('/newcontactadd','ContactsController@store');
-
-Route::post('/newuseradd','UsersController@store');
-
-Route::post('/newaddressadd','AddressController@store'); 
-
-Route::post('/newphoneadd','PhonesController@store');
-
-Route::post('/search', 'LiveSearchContacts@fetch')->name('search');
-
-Route::post('/searching', 'LiveSearchContacts@find');
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
+});

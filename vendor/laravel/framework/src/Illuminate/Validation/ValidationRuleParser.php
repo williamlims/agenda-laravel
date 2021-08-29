@@ -2,6 +2,8 @@
 
 namespace Illuminate\Validation;
 
+use Closure;
+use Illuminate\Contracts\Validation\Rule as RuleContract;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Exists;
@@ -85,9 +87,9 @@ class ValidationRuleParser
             return explode('|', $rule);
         } elseif (is_object($rule)) {
             return [$this->prepareRule($rule)];
-        } else {
-            return array_map([$this, 'prepareRule'], $rule);
         }
+
+        return array_map([$this, 'prepareRule'], $rule);
     }
 
     /**
@@ -98,13 +100,18 @@ class ValidationRuleParser
      */
     protected function prepareRule($rule)
     {
+        if ($rule instanceof Closure) {
+            $rule = new ClosureValidationRule($rule);
+        }
+
         if (! is_object($rule) ||
+            $rule instanceof RuleContract ||
             ($rule instanceof Exists && $rule->queryCallbacks()) ||
             ($rule instanceof Unique && $rule->queryCallbacks())) {
             return $rule;
         }
 
-        return strval($rule);
+        return (string) $rule;
     }
 
     /**
@@ -179,53 +186,57 @@ class ValidationRuleParser
     /**
      * Extract the rule name and parameters from a rule.
      *
-     * @param  array|string  $rules
+     * @param  array|string  $rule
      * @return array
      */
-    public static function parse($rules)
+    public static function parse($rule)
     {
-        if (is_array($rules)) {
-            $rules = static::parseArrayRule($rules);
-        } else {
-            $rules = static::parseStringRule($rules);
+        if ($rule instanceof RuleContract) {
+            return [$rule, []];
         }
 
-        $rules[0] = static::normalizeRule($rules[0]);
+        if (is_array($rule)) {
+            $rule = static::parseArrayRule($rule);
+        } else {
+            $rule = static::parseStringRule($rule);
+        }
 
-        return $rules;
+        $rule[0] = static::normalizeRule($rule[0]);
+
+        return $rule;
     }
 
     /**
      * Parse an array based rule.
      *
-     * @param  array  $rules
+     * @param  array  $rule
      * @return array
      */
-    protected static function parseArrayRule(array $rules)
+    protected static function parseArrayRule(array $rule)
     {
-        return [Str::studly(trim(Arr::get($rules, 0))), array_slice($rules, 1)];
+        return [Str::studly(trim(Arr::get($rule, 0, ''))), array_slice($rule, 1)];
     }
 
     /**
      * Parse a string based rule.
      *
-     * @param  string  $rules
+     * @param  string  $rule
      * @return array
      */
-    protected static function parseStringRule($rules)
+    protected static function parseStringRule($rule)
     {
         $parameters = [];
 
         // The format for specifying validation rules and parameters follows an
         // easy {rule}:{parameters} formatting convention. For instance the
         // rule "Max:3" states that the value may only be three letters.
-        if (strpos($rules, ':') !== false) {
-            list($rules, $parameter) = explode(':', $rules, 2);
+        if (strpos($rule, ':') !== false) {
+            [$rule, $parameter] = explode(':', $rule, 2);
 
-            $parameters = static::parseParameters($rules, $parameter);
+            $parameters = static::parseParameters($rule, $parameter);
         }
 
-        return [Str::studly(trim($rules)), $parameters];
+        return [Str::studly(trim($rule)), $parameters];
     }
 
     /**
@@ -237,7 +248,9 @@ class ValidationRuleParser
      */
     protected static function parseParameters($rule, $parameter)
     {
-        if (strtolower($rule) == 'regex') {
+        $rule = strtolower($rule);
+
+        if (in_array($rule, ['regex', 'not_regex', 'notregex'], true)) {
             return [$parameter];
         }
 
@@ -260,5 +273,36 @@ class ValidationRuleParser
             default:
                 return $rule;
         }
+    }
+
+    /**
+     * Expand and conditional rules in the given array of rules.
+     *
+     * @param  array  $rules
+     * @param  array  $data
+     * @return array
+     */
+    public static function filterConditionalRules($rules, array $data = [])
+    {
+        return collect($rules)->mapWithKeys(function ($attributeRules, $attribute) use ($data) {
+            if (! is_array($attributeRules) &&
+                ! $attributeRules instanceof ConditionalRules) {
+                return [$attribute => $attributeRules];
+            }
+
+            if ($attributeRules instanceof ConditionalRules) {
+                return [$attribute => $attributeRules->passes($data)
+                                ? array_filter($attributeRules->rules())
+                                : array_filter($attributeRules->defaultRules()), ];
+            }
+
+            return [$attribute => collect($attributeRules)->map(function ($rule) use ($data) {
+                if (! $rule instanceof ConditionalRules) {
+                    return [$rule];
+                }
+
+                return $rule->passes($data) ? $rule->rules() : $rule->defaultRules();
+            })->filter()->flatten(1)->values()->all()];
+        })->all();
     }
 }

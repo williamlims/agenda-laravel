@@ -15,8 +15,8 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
-use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
-use Symfony\Component\HttpKernel\Event\GetResponseEvent;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
@@ -26,20 +26,27 @@ use Symfony\Component\HttpKernel\KernelEvents;
  *
  * @author Bulat Shakirzyanov <mallluhuct@gmail.com>
  * @author Fabien Potencier <fabien@symfony.com>
+ *
+ * @internal
  */
 abstract class AbstractTestSessionListener implements EventSubscriberInterface
 {
     private $sessionId;
+    private $sessionOptions;
 
-    public function onKernelRequest(GetResponseEvent $event)
+    public function __construct(array $sessionOptions = [])
     {
-        if (!$event->isMasterRequest()) {
+        $this->sessionOptions = $sessionOptions;
+    }
+
+    public function onKernelRequest(RequestEvent $event)
+    {
+        if (!$event->isMainRequest()) {
             return;
         }
 
         // bootstrap the session
-        $session = $this->getSession();
-        if (!$session) {
+        if (!$session = $this->getSession()) {
             return;
         }
 
@@ -52,25 +59,32 @@ abstract class AbstractTestSessionListener implements EventSubscriberInterface
     }
 
     /**
-     * Checks if session was initialized and saves if current request is master
+     * Checks if session was initialized and saves if current request is the main request
      * Runs on 'kernel.response' in test environment.
      */
-    public function onKernelResponse(FilterResponseEvent $event)
+    public function onKernelResponse(ResponseEvent $event)
     {
-        if (!$event->isMasterRequest()) {
+        if (!$event->isMainRequest()) {
             return;
         }
 
-        if (!$session = $event->getRequest()->getSession()) {
+        $request = $event->getRequest();
+        if (!$request->hasSession()) {
             return;
         }
 
+        $session = $request->getSession();
         if ($wasStarted = $session->isStarted()) {
             $session->save();
         }
 
         if ($session instanceof Session ? !$session->isEmpty() || (null !== $this->sessionId && $session->getId() !== $this->sessionId) : $wasStarted) {
-            $params = session_get_cookie_params();
+            $params = session_get_cookie_params() + ['samesite' => null];
+            foreach ($this->sessionOptions as $k => $v) {
+                if (str_starts_with($k, 'cookie_')) {
+                    $params[substr($k, 7)] = $v;
+                }
+            }
 
             foreach ($event->getResponse()->headers->getCookies() as $cookie) {
                 if ($session->getName() === $cookie->getName() && $params['path'] === $cookie->getPath() && $params['domain'] == $cookie->getDomain()) {
@@ -78,12 +92,12 @@ abstract class AbstractTestSessionListener implements EventSubscriberInterface
                 }
             }
 
-            $event->getResponse()->headers->setCookie(new Cookie($session->getName(), $session->getId(), 0 === $params['lifetime'] ? 0 : time() + $params['lifetime'], $params['path'], $params['domain'], $params['secure'], $params['httponly']));
+            $event->getResponse()->headers->setCookie(new Cookie($session->getName(), $session->getId(), 0 === $params['lifetime'] ? 0 : time() + $params['lifetime'], $params['path'], $params['domain'], $params['secure'], $params['httponly'], false, $params['samesite'] ?: null));
             $this->sessionId = $session->getId();
         }
     }
 
-    public static function getSubscribedEvents()
+    public static function getSubscribedEvents(): array
     {
         return [
             KernelEvents::REQUEST => ['onKernelRequest', 192],
